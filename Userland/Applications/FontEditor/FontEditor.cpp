@@ -7,6 +7,7 @@
 #include "FontEditor.h"
 #include "GlyphEditorWidget.h"
 #include "GlyphMapWidget.h"
+#include "LibGfx/Font.h"
 #include "NewFontDialog.h"
 #include <AK/StringBuilder.h>
 #include <AK/UnicodeUtils.h>
@@ -639,24 +640,36 @@ void FontEditorWidget::undo()
     if (!m_undo_stack->can_undo())
         return;
     m_undo_stack->undo();
+
+    auto undo_one_glyph = [&](UndoGlyph& undo_glyph) {
+        auto glyph = undo_glyph.restored_code_point();
+        auto glyph_width = undo_glyph.restored_width();
+        m_edited_font->set_glyph_width(glyph, glyph_width);
+        m_glyph_map_widget->update_glyph(glyph);
+    };
+
+    undo_one_glyph(*m_undo_glyph);
+
     auto glyph = m_undo_glyph->restored_code_point();
     auto glyph_width = m_undo_glyph->restored_width();
+    if (m_edited_font->is_fixed_width())
+        m_glyph_editor_present_checkbox->set_checked(glyph_width > 0, GUI::AllowCallback::No);
+    else
+        m_glyph_editor_width_spinbox->set_value(glyph_width, GUI::AllowCallback::No);
+
+    for (auto& glyph : m_multiple_undo_glyphs)
+        undo_one_glyph(glyph);
+
     m_glyph_map_widget->set_active_glyph(glyph);
     m_glyph_map_widget->scroll_to_glyph(glyph);
-    if (m_edited_font->is_fixed_width()) {
-        m_glyph_editor_present_checkbox->set_checked(glyph_width > 0, GUI::AllowCallback::No);
-    } else {
-        m_glyph_editor_width_spinbox->set_value(glyph_width, GUI::AllowCallback::No);
-    }
-    m_edited_font->set_glyph_width(m_glyph_map_widget->active_glyph(), glyph_width);
     m_glyph_editor_widget->update();
-    m_glyph_map_widget->update_glyph(glyph);
     update_preview();
     update_statusbar();
 }
 
 void FontEditorWidget::redo()
 {
+    // TODO: Support redo for multiple commands
     if (!m_undo_stack->can_redo())
         return;
     m_undo_stack->redo();
@@ -844,6 +857,8 @@ void FontEditorWidget::paste_glyphs()
         return;
     auto first_glyph = metadata.get("first_glyph").value_or("0").to_uint().value_or(0);
 
+    NonnullRefPtrVector<UndoGlyph> old_bitmaps;
+
     InputMemoryStream stream(data.bytes());
     for (size_t s = 0; s < glyph_count; s++) {
         int copied_glyph {};
@@ -855,8 +870,9 @@ void FontEditorWidget::paste_glyphs()
             return;
         }
 
-        int glyph = m_glyph_map_widget->active_glyph() + (copied_glyph - first_glyph);
+        u32 glyph = m_glyph_map_widget->active_glyph() + (copied_glyph - first_glyph);
         auto bitmap = edited_font().raw_glyph(glyph).glyph_bitmap();
+        old_bitmaps.append(adopt_ref(*new UndoGlyph { glyph, edited_font() }));
         m_edited_font->set_glyph_width(glyph, min(width, edited_font().max_glyph_width()));
         for (int x = 0; x < min(width, edited_font().max_glyph_width()); x++) {
             for (int y = 0; y < min(height, edited_font().glyph_height()); y++) {
@@ -873,14 +889,18 @@ void FontEditorWidget::paste_glyphs()
             m_glyph_editor_widget->on_glyph_altered(glyph);
     }
 
+    m_undo_stack->push(make<MultipleGlyphsUndoCommand>(move(old_bitmaps)));
+
     m_glyph_editor_widget->update();
-    // TODO: Undo stack integration
 }
 
 void FontEditorWidget::delete_selected_glyphs()
 {
-    auto delete_glyph = [&](int glyph) {
+    NonnullRefPtrVector<UndoGlyph> old_bitmaps;
+
+    auto delete_glyph = [&](u32 glyph) {
         auto bitmap = m_edited_font->raw_glyph(glyph).glyph_bitmap();
+        old_bitmaps.append(adopt_ref(*new UndoGlyph { glyph, edited_font() }));
         m_edited_font->set_glyph_width(glyph, 0);
         for (int x = 0; x < m_edited_font->max_glyph_width(); x++)
             for (int y = 0; y < m_edited_font->glyph_height(); y++)
@@ -893,5 +913,7 @@ void FontEditorWidget::delete_selected_glyphs()
     for (int i = selection.start(); i < selection.start() + selection.size(); i++)
         delete_glyph(i);
 
-    // TODO: Undo stack integration
+    m_undo_stack->push(make<MultipleGlyphsUndoCommand>(move(old_bitmaps)));
+
+    m_glyph_editor_widget->update();
 }
