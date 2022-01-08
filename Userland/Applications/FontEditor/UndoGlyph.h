@@ -20,6 +20,7 @@ public:
     }
     NonnullRefPtr<UndoGlyph> save_state() const
     {
+        dbgln("UndoGlyph::save_state");
         auto state = adopt_ref(*new UndoGlyph(m_code_point, *m_font));
         auto glyph = font().glyph(m_code_point).glyph_bitmap();
         for (int x = 0; x < font().max_glyph_width(); x++)
@@ -30,6 +31,7 @@ public:
     }
     void restore_state(UndoGlyph const& state) const
     {
+        dbgln("UndoGlyph::restore_state");
         auto bitmap = font().glyph(state.m_code_point).glyph_bitmap();
         for (int x = 0; x < font().max_glyph_width(); x++)
             for (int y = 0; y < font().glyph_height(); y++)
@@ -80,9 +82,9 @@ private:
 
 class MultipleGlyphsUndoCommand : public GUI::Command {
 public:
-    MultipleGlyphsUndoCommand(NonnullRefPtrVector<UndoGlyph>& undo_glyphs)
+    MultipleGlyphsUndoCommand(NonnullRefPtrVector<UndoGlyph>&& undo_glyphs)
         : m_undo_states(save_state(undo_glyphs))
-        , m_undo_glyphs(undo_glyphs)
+        , m_undo_glyphs(move(undo_glyphs))
     {
     }
 
@@ -105,5 +107,5 @@ private:
     RefPtr<Gfx::BitmapFont> m_font;
     NonnullRefPtrVector<UndoGlyph> m_undo_states;
     NonnullRefPtrVector<UndoGlyph> m_redo_states;
-    NonnullRefPtrVector<UndoGlyph>& m_undo_glyphs;
+    NonnullRefPtrVector<UndoGlyph> m_undo_glyphs;
 };
