@@ -641,14 +641,10 @@ void FontEditorWidget::undo()
         return;
     m_undo_stack->undo();
 
-    auto undo_one_glyph = [&](UndoGlyph& undo_glyph) {
-        auto glyph = undo_glyph.restored_code_point();
-        auto glyph_width = undo_glyph.restored_width();
-        m_edited_font->set_glyph_width(glyph, glyph_width);
-        m_glyph_map_widget->update_glyph(glyph);
-    };
-
-    undo_one_glyph(*m_undo_glyph);
+    auto glyph = undo_glyph.restored_code_point();
+    auto glyph_width = undo_glyph.restored_width();
+    m_edited_font->set_glyph_width(glyph, glyph_width);
+    m_glyph_map_widget->update_glyph(glyph);
 
     auto glyph = m_undo_glyph->restored_code_point();
     auto glyph_width = m_undo_glyph->restored_width();
@@ -656,9 +652,6 @@ void FontEditorWidget::undo()
         m_glyph_editor_present_checkbox->set_checked(glyph_width > 0, GUI::AllowCallback::No);
     else
         m_glyph_editor_width_spinbox->set_value(glyph_width, GUI::AllowCallback::No);
-
-    for (auto& glyph : m_multiple_undo_glyphs)
-        undo_one_glyph(glyph);
 
     m_glyph_map_widget->set_active_glyph(glyph);
     m_glyph_map_widget->scroll_to_glyph(glyph);
