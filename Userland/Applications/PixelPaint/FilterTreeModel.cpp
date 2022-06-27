@@ -14,6 +14,7 @@
 #include "Filters/GaussBlur3.h"
 #include "Filters/GaussBlur5.h"
 #include "Filters/Grayscale.h"
+#include "Filters/HSVNoise.h"
 #include "Filters/Invert.h"
 #include "Filters/LaplaceCardinal.h"
 #include "Filters/LaplaceDiagonal.h"
@@ -56,6 +57,9 @@ ErrorOr<NonnullRefPtr<GUI::TreeViewModel>> create_filter_tree_model(ImageEditor*
     add_filter_node.template operator()<Filters::Grayscale>(color_category);
     add_filter_node.template operator()<Filters::Invert>(color_category);
     add_filter_node.template operator()<Filters::Sepia>(color_category);
+
+    auto noise_category = filter_tree_model->add_node("Noise", directory_icon);
+    add_filter_node.template operator()<Filters::HSVNoise>(noise_category);
 
     return filter_tree_model;
 }

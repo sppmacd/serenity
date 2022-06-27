@@ -28,6 +28,7 @@ set(SOURCES
     Filters/GaussBlur3.cpp
     Filters/GaussBlur5.cpp
     Filters/Grayscale.cpp
+    Filters/HSVNoise.cpp
     Filters/Invert.cpp
     Filters/LaplaceCardinal.cpp
     Filters/LaplaceDiagonal.cpp
